@@ -40,6 +40,24 @@ func (w *Widget) CheckinDate() string {
 	return timestr(w.LastCheckin)
 }
 
+func (w *Widget) CompileElapsed() string {
+	if w.LastCompile == 0 {
+		return "never"
+	}
+	elapsedHours := int64(now() - w.LastCompile) / 1e6 / 60 / 60
+	elapsedHours, elapsedDays := elapsedHours % 24, elapsedHours / 24
+	return fmt.Sprintf("%dd %dh", elapsedDays, elapsedHours)
+}
+
+func (w *Widget) CheckinElapsed() string {
+	if w.LastCheckin == 0 {
+		return "never"
+	}
+	elapsedHours := int64(now() - w.LastCheckin) / 1e6 / 60 / 60
+	elapsedHours, elapsedDays := elapsedHours % 24, elapsedHours / 24
+	return fmt.Sprintf("%dd %dh", elapsedDays, elapsedHours)
+}
+
 func (w *Widget) Commit() (err os.Error) {
 	w.key, err = datastore.Put(w.ctx, w.key, w)
 	return

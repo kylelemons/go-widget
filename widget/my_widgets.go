@@ -18,7 +18,9 @@ var myWidgetTemplate = ``+
 <body>
 <pre>
 === My Widgets ===
+</pre>
 {.repeated section Widget}
+<pre>
 Widget: {Name}
 	Repository Checkins:
 		Total:     {CheckinTotal}
@@ -36,9 +38,97 @@ Widget: {Name}
 success :
 	@curl -s "http://go-widget.appspot.com/hook/compile/{ID}/$$(uname -srm | md5)" >/dev/null
 --- %< ---
+</pre>
+
+<!--
+
+Primary Color: (green)
+28DE5F	40A65F	0D9035	5CEE88	83EEA4
+Secondary Color A: (blue)
+2AAFCE	3F899B	0E6F86	5DCDE7	82D4E7
+Secondary Color B: (orange)
+FF962F	BF844A	A65A0F	FFB063	FFC58C
+Complementary Color: (red)
+FF4B2F	BF5A4A	A6240F	FF7863	FF9C8C
+(accent, saturated, dark, pastel, light)
+
+-->
+
+<style type='text/css'>
+.gowidget, .gowidget *
+{.meta-left}
+	font-weight: normal;
+	color: {Colors.Main.Text};
+	background: {Colors.Main.Background};
+	border: 1px solid {Colors.Main.Border};
+	border-collapse: collapse;
+	border-spacing: 0;
+	padding: 0;
+	margin: 0;
+{.meta-right}
+
+.gowidget
+{.meta-left}
+	margin: 5px;
+{.meta-right}
+
+.gowidget th, .gowidget td
+{.meta-left}
+	padding: 2px 8px;
+	text-align: center;
+{.meta-right}
+
+.gowidget th
+{.meta-left}
+	font-weight: bold;
+{.meta-right}
+
+.gowidget thead th
+{.meta-left}
+	color: {Colors.Good.Text};
+	background: {Colors.Good.Background};
+	border: 1px solid {Colors.Good.Border};
+{.meta-right}
+
+.gowidget tbody tr th:first-child
+{.meta-left}
+	text-align: right;
+{.meta-right}
+</style>
+<table class='gowidget'>
+	<thead>
+		<tr>
+			<th colspan="3">{Name} - 5/5</td>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<th></th>
+			<th>Build</th>
+			<th>Commit</th>
+		</tr>
+		<tr>
+			<th>Weekly:</th>
+			<!--InstallWeek-->
+			<td>{CompileWeek}</td>
+			<td>{CheckinWeek}</td>
+		</tr>
+		<tr>
+			<th>Total:</th>
+			<!--InstallTotal-->
+			<td>{CompileTotal}</td>
+			<td>{CheckinTotal}</td>
+		</tr>
+		<tr>
+			<th>Last:</th>
+			<!--InstallElapsed-->
+			<td>{CompileElapsed}</td>
+			<td>{CheckinElapsed}</td>
+		</tr>
+	</tbody>
+</table>
 
 {.end}
-</pre>
 <form method="post" action="/widget/add">
 	<input name="name" />
 	<input type="submit" value="add" />
@@ -47,8 +137,24 @@ success :
 </html>
 `
 
+type Pallete struct {
+	Text, Text2, Border, Light, Background string
+}
+
+type colorScheme struct {
+	Main, Good, Warn, Bad Pallete
+}
+
+var scheme = colorScheme{
+	Main: Pallete{"#2E733E", "#30663C", "#1E602D", "#8BDD9D", "#B3DDBC"},
+	Good: Pallete{"#26585C", "#274E52", "#19494E", "#89D1D8", "#AFD4D8"},
+	Warn: Pallete{"#98683D", "#866140", "#805128", "#E6B991", "#E6CFBA"},
+	Bad:  Pallete{"#98463D", "#864640", "#803028", "#E69991", "#E6BEBA"},
+}
+
 type myWidgetData struct {
 	Widget []*Widget
+	Colors colorScheme
 }
 
 func myWidgets(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +167,9 @@ func myWidgets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := myWidgetData{}
+	data := myWidgetData{
+		Colors: scheme,
+	}
 
 	data.Widget, err = LoadWidgets(ctx)
 	if err != nil {
