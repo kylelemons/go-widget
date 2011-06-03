@@ -12,6 +12,7 @@ import (
 
 type Widget struct {
 	ctx            appengine.Context
+	key            *datastore.Key
 	Name           string
 	ID             string
 	Owner          string
@@ -40,8 +41,12 @@ func (w *Widget) CheckinDate() string {
 }
 
 func (w *Widget) Commit() (err os.Error) {
-	key := datastore.NewKey("Widget", w.ID, 0, nil)
-	_, err = datastore.Put(w.ctx, key, w)
+	w.key, err = datastore.Put(w.ctx, w.key, w)
+	return
+}
+
+func (w *Widget) Delete() (err os.Error) {
+	err = datastore.Delete(w.ctx, w.key)
 	return
 }
 
@@ -54,6 +59,7 @@ func NewWidget(ctx appengine.Context, name string) *Widget {
 
 	return &Widget{
 		ctx: ctx,
+		key: datastore.NewKey("Widget", hash, 0, nil),
 		Name: name,
 		ID: hash,
 		Owner: u.Email,
@@ -65,6 +71,7 @@ func LoadWidget(ctx appengine.Context, id string) (widget *Widget, err os.Error)
 
 	widget = new(Widget)
 	err = datastore.Get(ctx, key, widget)
+	widget.key = key
 
 	return
 }
@@ -76,9 +83,11 @@ func LoadWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	query.Filter("Owner =", u.Email)
 	query.Order("Name")
 
-	_, err = query.GetAll(ctx, &widgets)
-	for _, w := range widgets {
+	var k []*datastore.Key
+	k, err = query.GetAll(ctx, &widgets)
+	for i, w := range widgets {
 		w.ctx = ctx
+		w.key = k[i]
 	}
 
 	return
@@ -87,9 +96,11 @@ func LoadWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 func LoadAllWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	query := datastore.NewQuery("Widget")
 
-	_, err = query.GetAll(ctx, &widgets)
-	for _, w := range widgets {
+	var k []*datastore.Key
+	k, err = query.GetAll(ctx, &widgets)
+	for i, w := range widgets {
 		w.ctx = ctx
+		w.key = k[i]
 	}
 
 	return
