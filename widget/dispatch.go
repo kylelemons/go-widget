@@ -12,6 +12,7 @@ func init() {
 	http.HandleFunc("/widget/list", myWidgets)
 	http.HandleFunc("/widget/add", addWidget)
 	http.HandleFunc("/widget/show/", showWidget)
+	http.HandleFunc("/widget/update/", updateWidget)
 
 	http.HandleFunc("/hook/", fourOhFour)
 	http.HandleFunc("/hook/compile/", hookCompile)

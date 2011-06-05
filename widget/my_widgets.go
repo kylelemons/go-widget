@@ -34,15 +34,21 @@ var myWidgetTemplate = ``+
 <li>Rated at least +5 (Current: {PlusOnes})</li>
 <li>At least 5 compiles (Current: {CompileTotal})</li>
 <li>At least 1 compile at HEAD (Current: {CompileCheckin}) since the last Go release</li>
-<li>No more than 1 "won't build" mark at HEAD (Current: {WontBuilds})</li>
+<li>No more than 1 "won't build" at HEAD (Current: {WontBuilds})</li>
 <li>Set Home, Source, and Bug Report URLs</li>
 </ol>
 <h3>URLs</h3>
+<form method="post" action="/widget/update/{ID}">
 <table>
-<tr><td>Home:</td><td><input type="text" size="100" value="{HomeURL}"/></td></tr>
-<tr><td>Source:</td><td><input type="text" size="100" value="{SourceURL}"/></td></tr>
-<tr><td>Create Bug:</td><td><input type="text" size="100" value="{BugURL}"/></td></tr>
+<tr><td>Home:</td>
+<td><input name="home" type="text" size="100" value="{HomeURL|html}"/></td></tr>
+<tr><td>Source:</td>
+<td><input name="source" type="text" size="100" value="{SourceURL|html}"/></td></tr>
+<tr><td>Create Bug:</td>
+<td><input name="bug" type="text" size="100" value="{BugURL|html}"/></td></tr>
 </table>
+<input type="submit" value="Update"/>
+</form>
 <h3>Hooks</h3>
 Commit Hook URL: <pre>http://go-widget.appspot.com/hook/commit/{ID}</pre>
 Makefile:
@@ -165,9 +171,66 @@ func showWidget(w http.ResponseWriter, r *http.Request) {
 	full := widget.ExecuteString()
 	full = strings.Replace(full, "</", "<'+'/'+'", -1)
 	for lineno, line := range strings.Split(full, "\n", -1) {
-		fmt.Fprintf(w, "/*%3d*/ document.write('%s')\n", lineno+1, line)
+		fmt.Fprintf(w, "/*%3d*/ document.write('%s');\n", lineno+1, line)
 	}
 	if nojs {
 		fmt.Fprintf(w, "</script></body></html>")
 	}
+}
+
+func updateWidget(w http.ResponseWriter, r *http.Request) {
+	var err os.Error
+	ctx := appengine.NewContext(r)
+
+	fix := func(formname string) string {
+		raw := r.FormValue(formname)
+		if strings.Contains(raw, "'") {
+			ctx.Logf("Hacking attempt: %#q", raw)
+			return ""
+		}
+		url, err := http.ParseURLReference(raw)
+		if err != nil {
+			ctx.Logf("Bad URL: %#q", raw)
+			return ""
+		}
+		if scheme := strings.ToLower(url.Scheme); scheme != "http" && scheme != "https" {
+			ctx.Logf("Bad scheme: %%q", scheme)
+			return ""
+		}
+		return url.String()
+	}
+
+	bug := fix("bug")
+	home := fix("home")
+	source := fix("source")
+
+	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/", -1)
+	if cnt := len(path); cnt != 3 {
+		http.Error(w, "ID required", http.StatusBadRequest)
+		return
+	}
+
+	widgethash := path[2]
+	if len(widgethash) != 32 {
+		http.Error(w, "Invalid widget id: " + widgethash, http.StatusBadRequest)
+		return
+	}
+
+	widget, err := LoadWidget(ctx, widgethash)
+	if err != nil {
+		http.Error(w, "Unknown widget id: " + widgethash, http.StatusBadRequest)
+		return
+	}
+
+	widget.BugURL = bug
+	widget.HomeURL = home
+	widget.SourceURL = source
+
+	err = widget.Commit()
+	if err != nil {
+		http.Error(w, "Error comitting: " + err.String(), http.StatusBadRequest)
+		return
+	}
+
+	http.Redirect(w, r, "/widget/list", http.StatusFound)
 }

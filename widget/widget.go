@@ -103,6 +103,7 @@ func LoadWidget(ctx appengine.Context, id string) (widget *Widget, err os.Error)
 
 	widget = new(Widget)
 	err = datastore.Get(ctx, key, widget)
+	widget.ctx = ctx
 	widget.key = key
 
 	return
@@ -233,9 +234,9 @@ var widgetStaticTemplate = ``+
 </style>
 <script type="text/javascript">
 function expand(element, index) {
-	table = element.parentNode.parentNode.parentNode.parentNode.parentNode
-	table.tBodies[index].style.display = "table-row-group"
-	table.tBodies[1-index].style.display = "none"
+	table = element.parentNode.parentNode.parentNode.parentNode.parentNode;
+	table.tBodies[index].style.display = "table-row-group";
+	table.tBodies[1-index].style.display = "none";
 }
 </script>
 `
