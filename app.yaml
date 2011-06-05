@@ -17,6 +17,10 @@ handlers:
   script: _go_app
   login: optional
 
+- url: /widget/show/.*
+  script: _go_app
+  login: optional
+
 - url: /.*
   script: _go_app
   login: required
