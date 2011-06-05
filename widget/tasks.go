@@ -166,7 +166,6 @@ func taskSummary(w http.ResponseWriter, r *http.Request) {
 			w.CheckinTotal++
 			c.Counted = true
 			com <- c
-			w.WontBuilds = 0
 		}
 		w.CheckinWeek++
 		if c.Time > w.LastCheckin {
@@ -263,8 +262,6 @@ func taskUpgrade(out http.ResponseWriter, r *http.Request) {
 		w.HomeURL, _ = widget["HomeURL"].(string)
 		w.BugURL, _ = widget["BugURL"].(string)
 		w.SourceURL, _ = widget["SourceURL"].(string)
-		w.PlusOnes = optInt(widget["PlusOnes"])
-		w.WontBuilds = optInt(widget["WontBuilds"])
 		w.CompileTotal = optInt(widget["CompileTotal"])
 		w.CompileWeek = optInt(widget["CompileWeek"])
 		w.CompileCheckin = optInt(widget["CompileCheckin"])

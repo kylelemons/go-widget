@@ -18,6 +18,7 @@ func init() {
 	http.HandleFunc("/hook/compile/", hookCompile)
 	http.HandleFunc("/hook/commit/", hookCommit)
 	http.HandleFunc("/hook/plusone/", hookRating)
+	http.HandleFunc("/hook/wontbuild/", hookBroken)
 
 	http.HandleFunc("/task/", fourOhFour)
 	http.HandleFunc("/task/summary", taskSummary)

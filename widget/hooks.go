@@ -42,6 +42,45 @@ func hookRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO(kevlar): Referer?
+	http.Redirect(w, r, "/widget/list", http.StatusFound)
+}
+
+func hookBroken(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+
+	_ = ctx
+
+	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/", -1)
+	if len(path) != 3 {
+		http.Error(w, "ID required", http.StatusBadRequest)
+		return
+	}
+
+	widgethash := path[2]
+	if len(widgethash) != 32 {
+		http.Error(w, "Invalid widget id: " + widgethash, http.StatusBadRequest)
+		return
+	}
+
+	ip := r.RemoteAddr
+	if ip == "" {
+		ip = "devel"
+	}
+
+	if _, err := LoadWidget(ctx, widgethash); err != nil {
+		http.Error(w, "Unknown widget id: " + widgethash, http.StatusBadRequest)
+		return
+	}
+
+	brokenhash := widgethash + ip
+	broken := NewCountable(ctx, "Broken", widgethash, brokenhash)
+	if err := broken.Commit(); err != nil {
+		http.Error(w, err.String(), http.StatusInternalServerError)
+		return
+	}
+
+	// TODO(kevlar): Referer?
 	http.Redirect(w, r, "/widget/list", http.StatusFound)
 }
 
@@ -118,6 +157,19 @@ func hookCommit(w http.ResponseWriter, r *http.Request) {
 	if err := comm.Commit(); err != nil {
 		http.Error(w, err.String(), http.StatusInternalServerError)
 		return
+	}
+
+	// Delete all wontbuilds
+	broken, err := LoadCountable(ctx, "Broken", widgethash)
+	if err != nil {
+		http.Error(w, err.String(), http.StatusInternalServerError)
+		return
+	}
+	for _, broken := range broken {
+		if err := broken.Delete(); err != nil {
+			http.Error(w, err.String(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/plain")

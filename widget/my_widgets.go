@@ -31,7 +31,7 @@ var myWidgetTemplate = ``+
 </pre>
 <h3>Rating:</h3>
 <ol>
-<li>Rated at least +5 (Current: {PlusOnes})</li>
+<li>Rated at least +5 (Current: {Rating})</li>
 <li>At least 5 compiles (Current: {CompileTotal})</li>
 <li>At least 1 compile at HEAD (Current: {CompileCheckin}) since the last Go release</li>
 <li>No more than 1 "won't build" at HEAD (Current: {WontBuilds})</li>

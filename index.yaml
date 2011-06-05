@@ -16,6 +16,12 @@ indexes:
   - name: Time
     direction: desc
 
+- kind: Broken
+  properties:
+  - name: Widget
+  - name: Time
+    direction: desc
+
 - kind: Commit
   properties:
   - name: Widget

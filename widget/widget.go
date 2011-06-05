@@ -18,6 +18,9 @@ type Widget struct {
 	ctx appengine.Context
 	key *datastore.Key
 
+	rating int
+	badcnt int
+
 	Name  string
 	ID    string
 	Owner string
@@ -25,9 +28,6 @@ type Widget struct {
 	HomeURL   string
 	BugURL    string
 	SourceURL string
-
-	PlusOnes   int
-	WontBuilds int
 
 	CompileTotal   int
 	CompileWeek    int
@@ -90,11 +90,13 @@ func NewWidget(ctx appengine.Context, name string) *Widget {
 	hash := fmt.Sprintf("%X", sum.Sum())
 
 	return &Widget{
-		ctx:   ctx,
-		key:   datastore.NewKey("Widget", hash, 0, nil),
-		Name:  name,
-		ID:    hash,
-		Owner: u.Email,
+		ctx:    ctx,
+		key:    datastore.NewKey("Widget", hash, 0, nil),
+		rating: 0,
+		badcnt: 0,
+		Name:   name,
+		ID:     hash,
+		Owner:  u.Email,
 	}
 }
 
@@ -105,6 +107,8 @@ func LoadWidget(ctx appengine.Context, id string) (widget *Widget, err os.Error)
 	err = datastore.Get(ctx, key, widget)
 	widget.ctx = ctx
 	widget.key = key
+	widget.rating = -1
+	widget.badcnt = -1
 
 	return
 }
@@ -121,6 +125,8 @@ func LoadWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	for i, w := range widgets {
 		w.ctx = ctx
 		w.key = k[i]
+		w.rating = -1
+		w.badcnt = -1
 	}
 
 	return
@@ -134,21 +140,34 @@ func LoadAllWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	for i, w := range widgets {
 		w.ctx = ctx
 		w.key = k[i]
+		w.rating = -1
+		w.badcnt = -1
 	}
 
 	return
 }
 
 func (w *Widget) Rating() int {
-	query := datastore.NewQuery("Rating")
-	query.Filter("Widget =", w.key)
-	cnt, _ := query.Count(w.ctx)
-	return cnt
+	if w.rating == -1 {
+		query := datastore.NewQuery("Rating")
+		query.Filter("Widget =", w.key)
+		w.rating, _ = query.Count(w.ctx)
+	}
+	return w.rating
+}
+
+func (w *Widget) WontBuilds() int {
+	if w.badcnt == -1 {
+		query := datastore.NewQuery("Broken")
+		query.Filter("Widget =", w.key)
+		w.badcnt, _ = query.Count(w.ctx)
+	}
+	return w.badcnt
 }
 
 var widgetStatic string
-var widgetStaticTemplate = ``+
-`<style type="text/css">
+var widgetStaticTemplate = `` +
+	`<style type="text/css">
 .gowidget
 {
 	margin: 5px;
@@ -264,7 +283,7 @@ var widgetColors = ColorScheme{
 }
 
 var widgetTemplate = template.MustParse(``+
-`<table class="gowidget">
+	`<table class="gowidget">
 	<thead>
 		<tr>
 			<th colspan="3">
@@ -290,7 +309,7 @@ var widgetTemplate = template.MustParse(``+
 				Rating: {Rating} (<a href="/hook/plusone/{ID}">+</a>)
 			</td>
 			<td>
-				<a href="/hook/wontbuild/{ID}">Won&#39;t Build</a></span>
+				<a href="/hook/wontbuild/{ID}">Broken</a> ({WontBuilds})</span>
 			</td>
 		</tr>
 		<tr>
