@@ -128,6 +128,11 @@ func addWidget(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 	name := fixup.ReplaceAllString(r.FormValue("name"), "")
 
+	if len(name) == 0 {
+		http.Error(w, "Invalid/no name provided", http.StatusInternalServerError)
+		return
+	}
+
 	widget := NewWidget(ctx, name)
 
 	err = widget.Commit()
