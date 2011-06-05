@@ -32,9 +32,9 @@ var myWidgetTemplate = ``+
 <h3>Rating:</h3>
 <ol>
 <li>Rated at least +5 (Current: {Rating})</li>
-<li>At least 5 compiles (Current: {CompileTotal})</li>
-<li>At least 1 compile at HEAD (Current: {CompileCheckin}) since the last Go release</li>
-<li>No more than 1 "won't build" at HEAD (Current: {WontBuilds})</li>
+<li>At least 50 compiles (Current: {CompileTotal})</li>
+<li>At least 5 compile at HEAD (Current: {CompileCheckin}) since the last Go release</li>
+<li>No more than 1 "won't build" at HEAD (Current: {Broken})</li>
 <li>Set Home, Source, and Bug Report URLs</li>
 </ol>
 <h3>URLs</h3>

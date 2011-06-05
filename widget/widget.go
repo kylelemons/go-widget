@@ -147,6 +147,25 @@ func LoadAllWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	return
 }
 
+func (w *Widget) Score() (score int) {
+	if w.Rating() >= 5 {
+		score++
+	}
+	if w.Broken() <= 1 {
+		score++
+	}
+	if w.CompileTotal >= 50 {
+		score++
+	}
+	if w.CompileCheckin >= 5 {
+		score++
+	}
+	if len(w.BugURL) > 15 && len(w.SourceURL) > 15 && len(w.HomeURL) > 15 {
+		score++
+	}
+	return
+}
+
 func (w *Widget) Rating() int {
 	if w.rating == -1 {
 		query := datastore.NewQuery("Rating")
@@ -156,7 +175,7 @@ func (w *Widget) Rating() int {
 	return w.rating
 }
 
-func (w *Widget) WontBuilds() int {
+func (w *Widget) Broken() int {
 	if w.badcnt == -1 {
 		query := datastore.NewQuery("Broken")
 		query.Filter("Widget =", w.key)
@@ -287,7 +306,7 @@ var widgetTemplate = template.MustParse(``+
 	<thead>
 		<tr>
 			<th colspan="3">
-				<a href="{HomeURL}">{Name}</a> - 5/5
+				<a href="{HomeURL}">{Name}</a> - {Score}/5
 			</th>
 		</tr>
 	</thead>
@@ -309,7 +328,7 @@ var widgetTemplate = template.MustParse(``+
 				Rating: {Rating} (<a href="/hook/plusone/{ID}">+</a>)
 			</td>
 			<td>
-				<a href="/hook/wontbuild/{ID}">Broken</a> ({WontBuilds})</span>
+				<a href="/hook/wontbuild/{ID}">Broken</a> ({Broken})</span>
 			</td>
 		</tr>
 		<tr>
