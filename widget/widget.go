@@ -212,6 +212,11 @@ var widgetStaticTemplate = `` +
 	border: 1px solid ${Main.Border};
 }
 
+.gowidget tbody th
+{
+	width: 70px;
+}
+
 .gowidget thead th, .gowidget thead td
 {
 	color: ${Good.Text};
@@ -279,7 +284,7 @@ var widgetStaticTemplate = `` +
 </style>
 <script type="text/javascript">
 function expand(element, index) {
-	table = element.parentNode.parentNode.parentNode.parentNode.parentNode;
+	table = element.parentNode.parentNode.parentNode.parentNode;
 	table.tBodies[index].style.display = "table-row-group";
 	table.tBodies[1-index].style.display = "none";
 }
@@ -313,12 +318,11 @@ var widgetTemplate = template.MustParse(``+
 	<tfoot>
 		<tr>
 			<td colspan=3>
-				<div class="tiny">
-					<a href="#" onclick="expand(this, 0);return false">Project Info</a>
-				</div>
-				<div class="tiny">
-					<a href="#" onclick="expand(this, 1);return false">Build Status</a>
-				</div>
+				<a href="#" onclick="expand(this, 0);return false">Project</a>
+				-
+				<a href="#" onclick="expand(this, 1);return false">Builds</a>
+				-
+				Powered by <a href="http://go-widget.appspot.com/">Go-Widget</a>
 			</td>
 		</tr>
 	</tfoot>
@@ -347,19 +351,19 @@ var widgetTemplate = template.MustParse(``+
 			<th>Commit</th>
 		</tr>
 		<tr>
-			<th>Weekly:</th>
+			<th>Weekly</th>
 			<!--InstallWeek-->
 			<td>{CompileWeek}</td>
 			<td>{CheckinWeek}</td>
 		</tr>
 		<tr>
-			<th>Total:</th>
+			<th>Total</th>
 			<!--InstallTotal-->
 			<td>{CompileTotal}</td>
 			<td>{CheckinTotal}</td>
 		</tr>
 		<tr>
-			<th>Last:</th>
+			<th>Last</th>
 			<!--InstallElapsed-->
 			<td>{CompileElapsed}</td>
 			<td>{CheckinElapsed}</td>

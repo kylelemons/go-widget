@@ -19,6 +19,7 @@ var myWidgetTemplate = ``+
 <body>
 <h1>My Widgets</h1>
 {.repeated section Widget}
+<hr/>
 <h2>{Name}</h2>
 <h3>Embed:</h3>
 <pre>
@@ -33,7 +34,7 @@ var myWidgetTemplate = ``+
 <ol>
 <li>Rated at least +5 (Current: {Rating})</li>
 <li>At least 50 compiles (Current: {CompileTotal})</li>
-<li>At least 5 compile at HEAD (Current: {CompileCheckin}) since the last Go release</li>
+<li>At least 5 compile at HEAD (Current: {CompileCheckin})`+/*TODO(kevlar): since Go release*/`
 <li>No more than 1 "won't build" at HEAD (Current: {Broken})</li>
 <li>Set Home, Source, and Bug Report URLs</li>
 </ol>
