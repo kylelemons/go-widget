@@ -8,6 +8,43 @@ import (
 	"appengine"
 )
 
+func hookRating(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+
+	_ = ctx
+
+	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/", -1)
+	if len(path) != 3 {
+		http.Error(w, "ID required", http.StatusBadRequest)
+		return
+	}
+
+	widgethash := path[2]
+	if len(widgethash) != 32 {
+		http.Error(w, "Invalid widget id: " + widgethash, http.StatusBadRequest)
+		return
+	}
+
+	ip := r.RemoteAddr
+	if ip == "" {
+		ip = "devel"
+	}
+
+	if _, err := LoadWidget(ctx, widgethash); err != nil {
+		http.Error(w, "Unknown widget id: " + widgethash, http.StatusBadRequest)
+		return
+	}
+
+	ratinghash := widgethash + ip
+	rating := NewCountable(ctx, "Rating", widgethash, ratinghash)
+	if err := rating.Commit(); err != nil {
+		http.Error(w, err.String(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/widget/list", http.StatusFound)
+}
+
 func hookCompile(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 

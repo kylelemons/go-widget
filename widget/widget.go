@@ -139,6 +139,13 @@ func LoadAllWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	return
 }
 
+func (w *Widget) Rating() int {
+	query := datastore.NewQuery("Rating")
+	query.Filter("Widget =", w.key)
+	cnt, _ := query.Count(w.ctx)
+	return cnt
+}
+
 var widgetStatic string
 var widgetStaticTemplate = ``+
 `<style type="text/css">
@@ -280,7 +287,7 @@ var widgetTemplate = template.MustParse(``+
 	<tbody>
 		<tr>
 			<td>
-				Rating: {PlusOnes} (<a href="/hook/plusone/{ID}">+</a>)
+				Rating: {Rating} (<a href="/hook/plusone/{ID}">+</a>)
 			</td>
 			<td>
 				<a href="/hook/wontbuild/{ID}">Won&#39;t Build</a></span>
