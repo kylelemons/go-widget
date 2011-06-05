@@ -5,6 +5,7 @@ import (
 	"http"
 	"os"
 	"regexp"
+	"strings"
 	"template"
 
 	"appengine"
@@ -16,24 +17,36 @@ var myWidgetTemplate = ``+
 	<title>My Widgets</title>
 </head>
 <body>
-<pre>
-=== My Widgets ===
-</pre>
+<h1>My Widgets</h1>
 {.repeated section Widget}
+<h2>{Name}</h2>
+<h3>Embed:</h3>
 <pre>
-Widget: {Name}
-	Repository Checkins:
-		Total:     {CheckinTotal}
-		This Week: {CheckinWeek}
-		Last:      {CheckinDate}
-	Successful Compiles:
-		Total:     {CompileTotal}
-		This Week: {CompileWeek}
-		At HEAD:   {CompileCheckin}
-		Last:      {CompileDate}
-	Hook URLs:
-		Commit:    http://go-widget.appspot.com/hook/commit/{ID}
-	Makefile:
+&lt;script language="javascript" type="text/javascript"
+	source="http://go-widget.appspot.com/widget/show/{ID}/widget.js">
+&lt;/script>
+&lt;noscript>
+&lt;a href="http://go-widget.appspot.com/widget/show/{ID}">{Name}&lt;/a>
+&lt;/noscript>
+</pre>
+<h3>Rating:</h3>
+<ol>
+<li>Rated at least +5 (Current: {PlusOnes})</li>
+<li>At least 5 compiles (Current: {CompileTotal})</li>
+<li>At least 1 compile at HEAD (Current: {CompileCheckin}) since the last Go release</li>
+<li>No more than 1 "won't build" mark at HEAD (Current: {WontBuilds})</li>
+<li>Set Home, Source, and Bug Report URLs</li>
+</ol>
+<h3>URLs</h3>
+<table>
+<tr><td>Home:</td><td><input type="text" size="100" value="{HomeURL}"/></td></tr>
+<tr><td>Source:</td><td><input type="text" size="100" value="{SourceURL}"/></td></tr>
+<tr><td>Create Bug:</td><td><input type="text" size="100" value="{BugURL}"/></td></tr>
+</table>
+<h3>Hooks</h3>
+Commit Hook URL: <pre>http://go-widget.appspot.com/hook/commit/{ID}</pre>
+Makefile:
+<pre>
 --- %< ---
 success :
 	@curl -s "http://go-widget.appspot.com/hook/compile/{ID}/$$(uname -srm | md5)" >/dev/null
@@ -54,79 +67,7 @@ FF4B2F	BF5A4A	A6240F	FF7863	FF9C8C
 
 -->
 
-<style type='text/css'>
-.gowidget, .gowidget *
-{.meta-left}
-	font-weight: normal;
-	color: {Colors.Main.Text};
-	background: {Colors.Main.Background};
-	border: 1px solid {Colors.Main.Border};
-	border-collapse: collapse;
-	border-spacing: 0;
-	padding: 0;
-	margin: 0;
-{.meta-right}
-
-.gowidget
-{.meta-left}
-	margin: 5px;
-{.meta-right}
-
-.gowidget th, .gowidget td
-{.meta-left}
-	padding: 2px 8px;
-	text-align: center;
-{.meta-right}
-
-.gowidget th
-{.meta-left}
-	font-weight: bold;
-{.meta-right}
-
-.gowidget thead th
-{.meta-left}
-	color: {Colors.Good.Text};
-	background: {Colors.Good.Background};
-	border: 1px solid {Colors.Good.Border};
-{.meta-right}
-
-.gowidget tbody tr th:first-child
-{.meta-left}
-	text-align: right;
-{.meta-right}
-</style>
-<table class='gowidget'>
-	<thead>
-		<tr>
-			<th colspan="3">{Name} - 5/5</td>
-		</tr>
-	</thead>
-	<tbody>
-		<tr>
-			<th></th>
-			<th>Build</th>
-			<th>Commit</th>
-		</tr>
-		<tr>
-			<th>Weekly:</th>
-			<!--InstallWeek-->
-			<td>{CompileWeek}</td>
-			<td>{CheckinWeek}</td>
-		</tr>
-		<tr>
-			<th>Total:</th>
-			<!--InstallTotal-->
-			<td>{CompileTotal}</td>
-			<td>{CheckinTotal}</td>
-		</tr>
-		<tr>
-			<th>Last:</th>
-			<!--InstallElapsed-->
-			<td>{CompileElapsed}</td>
-			<td>{CheckinElapsed}</td>
-		</tr>
-	</tbody>
-</table>
+{ExecuteString}
 
 {.end}
 <form method="post" action="/widget/add">
@@ -137,24 +78,8 @@ FF4B2F	BF5A4A	A6240F	FF7863	FF9C8C
 </html>
 `
 
-type Pallete struct {
-	Text, Text2, Border, Light, Background string
-}
-
-type colorScheme struct {
-	Main, Good, Warn, Bad Pallete
-}
-
-var scheme = colorScheme{
-	Main: Pallete{"#2E733E", "#30663C", "#1E602D", "#8BDD9D", "#B3DDBC"},
-	Good: Pallete{"#26585C", "#274E52", "#19494E", "#89D1D8", "#AFD4D8"},
-	Warn: Pallete{"#98683D", "#866140", "#805128", "#E6B991", "#E6CFBA"},
-	Bad:  Pallete{"#98463D", "#864640", "#803028", "#E69991", "#E6BEBA"},
-}
-
 type myWidgetData struct {
 	Widget []*Widget
-	Colors colorScheme
 }
 
 func myWidgets(w http.ResponseWriter, r *http.Request) {
@@ -167,9 +92,7 @@ func myWidgets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := myWidgetData{
-		Colors: scheme,
-	}
+	data := myWidgetData{ }
 
 	data.Widget, err = LoadWidgets(ctx)
 	if err != nil {
@@ -207,4 +130,44 @@ func addWidget(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/widget/list", http.StatusFound)
+}
+
+func showWidget(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+
+	_ = ctx
+
+	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/", -1)
+	if cnt := len(path); cnt < 3 || cnt > 4 {
+		http.Error(w, "ID required, widget.js optional", http.StatusBadRequest)
+		return
+	}
+	nojs := len(path) == 3
+
+	widgethash := path[2]
+	if len(widgethash) != 32 {
+		http.Error(w, "Invalid widget id: " + widgethash, http.StatusBadRequest)
+		return
+	}
+
+	widget, err := LoadWidget(ctx, widgethash)
+	if err != nil {
+		http.Error(w, "Unknown widget id: " + widgethash, http.StatusBadRequest)
+		return
+	}
+
+	if nojs {
+		fmt.Fprintf(w, "<html><head><title>"+widget.Name+"</title></head><body>\n")
+		fmt.Fprintf(w, "<script language='javascript' type='text/javascript'>\n")
+	} else {
+		w.Header().Set("Content-Type", "text/javascript")
+	}
+	full := widget.ExecuteString()
+	full = strings.Replace(full, "</", "<'+'/'+'", -1)
+	for lineno, line := range strings.Split(full, "\n", -1) {
+		fmt.Fprintf(w, "/*%3d*/ document.write('%s')\n", lineno+1, line)
+	}
+	if nojs {
+		fmt.Fprintf(w, "</script></body></html>")
+	}
 }
