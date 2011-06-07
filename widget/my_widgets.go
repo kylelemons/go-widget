@@ -107,6 +107,14 @@ func myWidgets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(r.FormValue("ids_only")) > 0 {
+		w.Header().Set("Content-Type", "text/plain")
+		for _, widget := range data.Widget {
+			fmt.Fprintln(w, widget.ID)
+		}
+		return
+	}
+
 	page.Execute(w, data)
 
 	fmt.Fprintf(w, "<!--\n%#v\n-->", r)

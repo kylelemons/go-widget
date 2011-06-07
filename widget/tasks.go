@@ -10,6 +10,122 @@ import (
 	"appengine/taskqueue"
 )
 
+func taskWipe(w http.ResponseWriter, r *http.Request) {
+	var (
+		err  os.Error
+		done = make(chan os.Error)
+
+		ctx = appengine.NewContext(r)
+
+		//widgets []*Widget
+		comps   []*Compilation
+		commits []*Commit
+		archs   []*Architecture
+		rcs, bcs []*Countable
+	)
+
+	/*
+	go func() {
+		var e os.Error
+		widgets, e = LoadAllWidgets(ctx)
+		done <- e
+	}()
+	*/
+
+	go func() {
+		var e os.Error
+		comps, e = LoadAllCompilations(ctx)
+		if e != nil {
+			done <- e
+			return
+		}
+		ctx.Logf("Loaded %d builds", len(comps))
+
+		// Delete all
+		for _, victim := range comps {
+			victim.Delete()
+		}
+
+		done <- e
+	}()
+
+	go func() {
+		var e os.Error
+		commits, e = LoadAllCommits(ctx)
+		if e != nil {
+			done <- e
+			return
+		}
+		ctx.Logf("Loaded %d commits", len(commits))
+
+		// Delete all
+		for _, victim := range commits {
+			victim.Delete()
+		}
+
+		done <- e
+	}()
+
+	go func() {
+		var e os.Error
+		archs, e = LoadAllArchitectures(ctx)
+		ctx.Logf("Loaded %d architectures", len(archs))
+
+		// Delete all
+		for _, victim := range archs {
+			victim.Delete()
+		}
+
+		done <- e
+	}()
+
+	go func() {
+		var e os.Error
+		rcs, e = LoadAllCountable(ctx, "Rating")
+		ctx.Logf("Loaded %d ratings", len(rcs))
+
+		// Delete all
+		for _, victim := range rcs {
+			victim.Delete()
+		}
+
+		done <- e
+	}()
+
+	go func() {
+		var e os.Error
+		bcs, e = LoadAllCountable(ctx, "Broken")
+		ctx.Logf("Loaded %d broken", len(bcs))
+
+		// Delete all
+		for _, victim := range bcs {
+			victim.Delete()
+		}
+
+		done <- e
+	}()
+
+	for i := 0; i < 5; i++ {
+		e := <-done
+		if e != nil {
+			if err == nil {
+				w.Header().Set("Content-Type", "text/plain")
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			err = e
+			fmt.Fprintf(w, "Error loading datastore: %s\n", err)
+			ctx.Logf("Error loading datastore: %s", err)
+			return
+		}
+	}
+
+	ctx.Logf("Deleted: %d compiles, %d commits, %d architectures, %d ratings, %d broken",
+		len(comps), len(commits), len(archs), len(rcs), len(bcs))
+
+	w.Header().Set("Content-Type", "text/plain")
+	fmt.Fprintf(w, "OK")
+}
+
 func taskSummary(w http.ResponseWriter, r *http.Request) {
 	var (
 		err  os.Error

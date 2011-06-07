@@ -23,6 +23,7 @@ func init() {
 	http.HandleFunc("/task/", fourOhFour)
 	http.HandleFunc("/task/summary", taskSummary)
 	http.HandleFunc("/task/upgrade", taskUpgrade)
+	http.HandleFunc("/task/wipe/datastore", taskWipe)
 
 	// TODO(kevlar): Remove things that don't build with release
 	// http://go.googlecode.com/hg/.hgtags | grep release\. | sort -n | tail -n 1
