@@ -56,7 +56,7 @@ Makefile:
 <pre>
 --- %< ---
 success :
-	@curl -s "http://go-widget.appspot.com/hook/compile/{ID}/$$(uname -srm | md5)" >/dev/null
+	@curl -s "http://go-widget.appspot.com/hook/compile/{ID}" >/dev/null
 --- %< ---
 </pre>
 

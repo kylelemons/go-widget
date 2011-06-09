@@ -2,7 +2,6 @@ package widget
 
 import (
 	"bytes"
-	"crypto/md5"
 	"fmt"
 	"html"
 	"io"
@@ -11,6 +10,7 @@ import (
 
 	"appengine"
 	"appengine/user"
+	"appengine/memcache"
 	"appengine/datastore"
 )
 
@@ -18,8 +18,20 @@ type Widget struct {
 	ctx appengine.Context
 	key *datastore.Key
 
+	populated bool
+	dirty bool
+
 	rating int
-	badcnt int
+	broken int
+
+	builds int
+	buildWeek int
+	buildHead int
+	buildLast datastore.Time
+
+	commits int
+	commitWeek int
+	commitLast datastore.Time
 
 	Name  string
 	ID    string
@@ -28,46 +40,40 @@ type Widget struct {
 	HomeURL   string
 	BugURL    string
 	SourceURL string
-
-	CompileTotal   int
-	CompileWeek    int
-	CompileCheckin int
-	CheckinTotal   int
-	CheckinWeek    int
-
-	LastCompile  datastore.Time
-	LastCheckin  datastore.Time
-	StatsUpdated datastore.Time
 }
 
 func (w *Widget) CompileDate() string {
-	if w.LastCompile == 0 {
+	if !w.populated { w.populate() }
+	if w.buildLast == 0 {
 		return "never"
 	}
-	return timestr(w.LastCompile)
+	return timestr(w.buildLast)
 }
 
 func (w *Widget) CheckinDate() string {
-	if w.LastCheckin == 0 {
+	if !w.populated { w.populate() }
+	if w.commitLast == 0 {
 		return "never"
 	}
-	return timestr(w.LastCheckin)
+	return timestr(w.commitLast)
 }
 
 func (w *Widget) CompileElapsed() string {
-	if w.LastCompile == 0 {
+	if !w.populated { w.populate() }
+	if w.buildLast == 0 {
 		return "never"
 	}
-	elapsedHours := int64(now()-w.LastCompile) / 1e6 / 60 / 60
+	elapsedHours := int64(now()-w.buildLast) / 1e6 / 60 / 60
 	elapsedHours, elapsedDays := elapsedHours%24, elapsedHours/24
 	return fmt.Sprintf("%dd %dh", elapsedDays, elapsedHours)
 }
 
 func (w *Widget) CheckinElapsed() string {
-	if w.LastCheckin == 0 {
+	if !w.populated { w.populate() }
+	if w.commitLast == 0 {
 		return "never"
 	}
-	elapsedHours := int64(now()-w.LastCheckin) / 1e6 / 60 / 60
+	elapsedHours := int64(now()-w.commitLast) / 1e6 / 60 / 60
 	elapsedHours, elapsedDays := elapsedHours%24, elapsedHours/24
 	return fmt.Sprintf("%dd %dh", elapsedDays, elapsedHours)
 }
@@ -85,18 +91,15 @@ func (w *Widget) Delete() (err os.Error) {
 func NewWidget(ctx appengine.Context, name string) *Widget {
 	u := user.Current(ctx)
 
-	sum := md5.New()
-	fmt.Fprintf(sum, "Owner=%s|Widget=%s", u.Email, name)
-	hash := fmt.Sprintf("%X", sum.Sum())
+	hash := Hashf("Owner=%s|Widget=%s", u.Email, name)
 
 	return &Widget{
 		ctx:    ctx,
 		key:    datastore.NewKey("Widget", hash, 0, nil),
-		rating: 0,
-		badcnt: 0,
 		Name:   name,
 		ID:     hash,
 		Owner:  u.Email,
+		populated: true,
 	}
 }
 
@@ -107,8 +110,6 @@ func LoadWidget(ctx appengine.Context, id string) (widget *Widget, err os.Error)
 	err = datastore.Get(ctx, key, widget)
 	widget.ctx = ctx
 	widget.key = key
-	widget.rating = -1
-	widget.badcnt = -1
 
 	return
 }
@@ -125,8 +126,6 @@ func LoadWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	for i, w := range widgets {
 		w.ctx = ctx
 		w.key = k[i]
-		w.rating = -1
-		w.badcnt = -1
 	}
 
 	return
@@ -140,24 +139,23 @@ func LoadAllWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	for i, w := range widgets {
 		w.ctx = ctx
 		w.key = k[i]
-		w.rating = -1
-		w.badcnt = -1
 	}
 
 	return
 }
 
 func (w *Widget) Score() (score int) {
-	if w.Rating() >= 5 {
+	if !w.populated { w.populate() }
+	if w.rating >= 5 {
 		score++
 	}
-	if w.Broken() <= 1 {
+	if w.broken <= 1 {
 		score++
 	}
-	if w.CompileTotal >= 50 {
+	if w.builds >= 50 {
 		score++
 	}
-	if w.CompileCheckin >= 5 {
+	if w.buildHead >= 5 {
 		score++
 	}
 	if len(w.BugURL) > 15 && len(w.SourceURL) > 15 && len(w.HomeURL) > 15 {
@@ -166,22 +164,180 @@ func (w *Widget) Score() (score int) {
 	return
 }
 
-func (w *Widget) Rating() int {
-	if w.rating == -1 {
-		query := datastore.NewQuery("Rating")
-		query.Filter("Widget =", w.key)
-		w.rating, _ = query.Count(w.ctx)
+func (w *Widget) populate() {
+	defer func() {
+		if err := recover(); err != nil {
+			w.ctx.Logf("populate(): %s", err)
+		}
+	}()
+
+	chk := func(err os.Error) bool {
+		switch err {
+		case nil:
+			return true
+		case datastore.Done:
+			return false
+		}
+		panic(err)
 	}
+
+	if w.populated { return }
+
+	cache := make(map[string]interface{})
+	if !w.dirty {
+		if _, err := memcache.Gob.Get(w.ctx, "widget:"+w.ID, &cache); err != memcache.ErrCacheMiss {
+			chk(err)
+
+			w.ctx.Logf("Cache hit: %s", w.ID)
+			w.ctx.Logf(" - %v", cache)
+
+			w.rating = cache["Rating"].(int)
+			w.broken = cache["Broken"].(int)
+
+			w.builds = cache["Builds"].(int)
+			w.buildWeek = cache["BuildWeek"].(int)
+			w.buildHead = cache["BuildHead"].(int)
+			w.buildLast = datastore.Time(cache["BuildLast"].(int64))
+
+			w.commits = cache["Commits"].(int)
+			w.commitWeek = cache["CommitWeek"].(int)
+			w.commitLast = datastore.Time(cache["CommitLast"].(int64))
+
+			w.populated = true
+			return
+		}
+	} else {
+		w.ctx.Logf("Cache: Widget %s is dirty", w.ID)
+	}
+
+	lastweek := now() - datastore.SecondsToTime(7*24*60*60)
+
+	var query *datastore.Query
+	var items []*Countable
+	var err os.Error
+
+	// Broken
+	query = datastore.NewQuery("Broken")
+	query.Filter("Widget =", w.key)
+	w.broken, err = query.Count(w.ctx)
+	chk(err)
+	w.ctx.Logf("Widget %s has %d broken", w.ID, w.broken)
+
+	// Rating
+	query = datastore.NewQuery("Rating")
+	query.Filter("Widget =", w.key)
+	w.rating, err = query.Count(w.ctx)
+	chk(err)
+	w.ctx.Logf("Widget %s has %d rating", w.ID, w.rating)
+
+	// Get Commits
+	query = datastore.NewQuery("Commit")
+	query.Filter("Widget =", w.key)
+	query.Order("-Time")
+	w.commits, err = query.Count(w.ctx)
+	chk(err)
+	w.ctx.Logf("Widget %s has %d commits", w.ID, w.commits)
+	query.Filter("Time >", lastweek)
+	w.commitWeek, err = query.Count(w.ctx)
+	chk(err)
+	w.ctx.Logf("Widget %s has %d commits this week", w.ID, w.commitWeek)
+
+	query = datastore.NewQuery("Commit")
+	query.Filter("Widget =", w.key)
+	query.Order("-Time")
+	query.Limit(1)
+	_, err = query.GetAll(w.ctx, &items)
+	chk(err)
+	if len(items) > 0 {
+		w.commitLast = items[0].Time
+	}
+	w.ctx.Logf("Widget %s was committed %d", w.ID, w.commitLast)
+
+	// Get builds
+	query = datastore.NewQuery("Build")
+	query.Filter("Widget =", w.key)
+	query.Order("-Time")
+	w.builds, err = query.Count(w.ctx)
+	chk(err)
+	w.ctx.Logf("Widget %s has %d builds", w.ID, w.builds)
+	query.Filter("Time >", lastweek)
+	w.buildWeek, err = query.Count(w.ctx)
+	chk(err)
+	w.ctx.Logf("Widget %s has %d builds this week", w.ID, w.buildWeek)
+
+	query = datastore.NewQuery("Build")
+	query.Filter("Widget =", w.key)
+	query.Order("-Time")
+	query.Limit(1)
+	_, err = query.GetAll(w.ctx, &items)
+	chk(err)
+	if len(items) > 0 {
+		w.buildLast = items[0].Time
+	}
+	if w.commitLast > 0 {
+		query.Filter("Time >", w.commitLast)
+		w.buildHead, err = query.Count(w.ctx)
+		chk(err)
+	} else {
+		w.buildHead = 0
+		w.ctx.Logf("Widget %s has no commits", w.ID)
+	}
+	w.ctx.Logf("Widget %s has %d builds at HEAD", w.ID, w.buildHead)
+
+	w.populated = true
+	w.ctx.Logf("Widget %s populated", w.ID)
+
+	cache["Broken"] = w.broken
+	cache["Rating"] = w.rating
+	cache["Builds"] = w.builds
+	cache["BuildWeek"] = w.buildWeek
+	cache["BuildHead"] = w.buildHead
+	cache["BuildLast"] = int64(w.buildLast)
+	cache["Commits"] = w.commits
+	cache["CommitWeek"] = w.commitWeek
+	cache["CommitLast"] = int64(w.commitLast)
+	err = memcache.Gob.Set(w.ctx, &memcache.Item{
+		Key: "widget:"+w.ID,
+		Expiration: 12*60*60, // 12 hours (because we do some date calculation in here)
+		Object: cache,
+	})
+	chk(err)
+	w.ctx.Logf("Cached: Widget %s", w.ID)
+}
+
+func (w *Widget) Rating() int {
+	if !w.populated { w.populate() }
 	return w.rating
 }
 
 func (w *Widget) Broken() int {
-	if w.badcnt == -1 {
-		query := datastore.NewQuery("Broken")
-		query.Filter("Widget =", w.key)
-		w.badcnt, _ = query.Count(w.ctx)
-	}
-	return w.badcnt
+	if !w.populated { w.populate() }
+	return w.broken
+}
+
+func (w *Widget) CompileTotal() int {
+	if !w.populated { w.populate() }
+	return w.builds
+}
+
+func (w *Widget) CompileWeek() int {
+	if !w.populated { w.populate() }
+	return w.buildWeek
+}
+
+func (w *Widget) CompileCheckin() int {
+	if !w.populated { w.populate() }
+	return w.buildHead
+}
+
+func (w *Widget) CheckinTotal() int {
+	if !w.populated { w.populate() }
+	return w.commits
+}
+
+func (w *Widget) CheckinWeek() int {
+	if !w.populated { w.populate() }
+	return w.commitWeek
 }
 
 var widgetStatic string

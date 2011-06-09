@@ -8,20 +8,40 @@ import (
 	"appengine"
 )
 
-func hookRating(w http.ResponseWriter, r *http.Request) {
+func hookCountable(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 
-	_ = ctx
-
 	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/", -1)
-	if len(path) != 3 {
-		http.Error(w, "ID required", http.StatusBadRequest)
+	if len(path) < 3 {
+		http.Error(w, "/hook/{type}/{widget} - missing required path segment", http.StatusBadRequest)
 		return
 	}
 
-	widgethash := path[2]
-	if len(widgethash) != 32 {
-		http.Error(w, "Invalid widget id: " + widgethash, http.StatusBadRequest)
+	var uniqueKey int64
+	var countable string
+	switch path[1] {
+	case "plusone":
+		countable = "Rating"
+	case "wontbuild":
+		countable = "Broken"
+	case "compile":
+		countable = "Build"
+		uniqueKey = int64(now())
+	case "commit":
+		countable = "Commit"
+		uniqueKey = int64(now())
+	default:
+		http.Error(w, "/hook/{type}/{widget} - unknown type", http.StatusBadRequest)
+		return
+	}
+
+	widget := path[2]
+	if len(widget) != 32 {
+		http.Error(w, "Invalid widget id: " + widget, http.StatusBadRequest)
+		return
+	}
+	if _, err := LoadWidget(ctx, widget); err != nil {
+		http.Error(w, "Unknown widget id: " + widget, http.StatusBadRequest)
 		return
 	}
 
@@ -30,147 +50,17 @@ func hookRating(w http.ResponseWriter, r *http.Request) {
 		ip = "devel"
 	}
 
-	if _, err := LoadWidget(ctx, widgethash); err != nil {
-		http.Error(w, "Unknown widget id: " + widgethash, http.StatusBadRequest)
-		return
-	}
-
-	ratinghash := widgethash + ip
-	rating := NewCountable(ctx, "Rating", widgethash, ratinghash)
-	if err := rating.Commit(); err != nil {
+	keyhash := Hashf("IP=%s|Unique=%d", ip, uniqueKey)
+	obj := NewCountable(ctx, countable, widget, keyhash)
+	if err := obj.Commit(); err != nil {
 		http.Error(w, err.String(), http.StatusInternalServerError)
 		return
 	}
+
+	refreshWidget(w,r,widget)
 
 	// TODO(kevlar): Referer?
-	http.Redirect(w, r, "/widget/list", http.StatusFound)
-}
-
-func hookBroken(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-
-	_ = ctx
-
-	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/", -1)
-	if len(path) != 3 {
-		http.Error(w, "ID required", http.StatusBadRequest)
-		return
-	}
-
-	widgethash := path[2]
-	if len(widgethash) != 32 {
-		http.Error(w, "Invalid widget id: " + widgethash, http.StatusBadRequest)
-		return
-	}
-
-	ip := r.RemoteAddr
-	if ip == "" {
-		ip = "devel"
-	}
-
-	if _, err := LoadWidget(ctx, widgethash); err != nil {
-		http.Error(w, "Unknown widget id: " + widgethash, http.StatusBadRequest)
-		return
-	}
-
-	brokenhash := widgethash + ip
-	broken := NewCountable(ctx, "Broken", widgethash, brokenhash)
-	if err := broken.Commit(); err != nil {
-		http.Error(w, err.String(), http.StatusInternalServerError)
-		return
-	}
-
-	// TODO(kevlar): Referer?
-	http.Redirect(w, r, "/widget/list", http.StatusFound)
-}
-
-func hookCompile(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-
-	_ = ctx
-
-	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/", -1)
-	if len(path) != 4 {
-		http.Error(w, "ID/Hash required", http.StatusBadRequest)
-		return
-	}
-
-	widgethash, archhash := path[2], path[3]
-	if len(widgethash) != 32 {
-		http.Error(w, "Invalid widget id: " + widgethash, http.StatusBadRequest)
-		return
-	}
-	if len(archhash) != 32 {
-		http.Error(w, "Invalid hash: " + archhash, http.StatusBadRequest)
-		return
-	}
-
-	ip := r.RemoteAddr
-	if ip == "" {
-		ip = "devel"
-	}
-
-	if _, err := LoadWidget(ctx, widgethash); err != nil {
-		http.Error(w, "Unknown widget id: " + widgethash, http.StatusBadRequest)
-		return
-	}
-
-	arch := NewArchitecture(ctx, widgethash, archhash)
-	if err := arch.Commit(); err != nil {
-		http.Error(w, err.String(), http.StatusInternalServerError)
-		return
-	}
-
-	comp := NewCompilation(ctx, widgethash, ip)
-	if err := comp.Commit(); err != nil {
-		http.Error(w, err.String(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprintf(w, "OK")
-}
-
-func hookCommit(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-
-	_ = ctx
-
-	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/", -1)
-	if len(path) != 3 {
-		http.Error(w, "ID required", http.StatusBadRequest)
-		return
-	}
-
-	widgethash := path[2]
-	if len(widgethash) != 32 {
-		http.Error(w, "Invalid widget id: " + widgethash, http.StatusBadRequest)
-		return
-	}
-
-	if _, err := LoadWidget(ctx, widgethash); err != nil {
-		http.Error(w, "Unknown widget id: " + widgethash, http.StatusBadRequest)
-		return
-	}
-
-	comm := NewCommit(ctx, widgethash)
-	if err := comm.Commit(); err != nil {
-		http.Error(w, err.String(), http.StatusInternalServerError)
-		return
-	}
-
-	// Delete all wontbuilds
-	broken, err := LoadCountable(ctx, "Broken", widgethash)
-	if err != nil {
-		http.Error(w, err.String(), http.StatusInternalServerError)
-		return
-	}
-	for _, broken := range broken {
-		if err := broken.Delete(); err != nil {
-			http.Error(w, err.String(), http.StatusInternalServerError)
-			return
-		}
-	}
+	//http.Redirect(w, r, "/widget/list", http.StatusFound)
 
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprintf(w, "OK")

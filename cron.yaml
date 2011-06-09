@@ -1,4 +1,1 @@
 cron:
-- description: Checkin/Compilation Summary
-  url: /task/summary
-  schedule: every 15 minutes

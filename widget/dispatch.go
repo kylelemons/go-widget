@@ -14,16 +14,11 @@ func init() {
 	http.HandleFunc("/widget/show/", showWidget)
 	http.HandleFunc("/widget/update/", updateWidget)
 
-	http.HandleFunc("/hook/", fourOhFour)
-	http.HandleFunc("/hook/compile/", hookCompile)
-	http.HandleFunc("/hook/commit/", hookCommit)
-	http.HandleFunc("/hook/plusone/", hookRating)
-	http.HandleFunc("/hook/wontbuild/", hookBroken)
+	http.HandleFunc("/hook/", hookCountable)
 
 	http.HandleFunc("/task/", fourOhFour)
-	http.HandleFunc("/task/summary", taskSummary)
 	http.HandleFunc("/task/upgrade", taskUpgrade)
-	http.HandleFunc("/task/wipe/datastore", taskWipe)
+	http.HandleFunc("/task/refresh/", taskRefresh)
 
 	// TODO(kevlar): Remove things that don't build with release
 	// http://go.googlecode.com/hg/.hgtags | grep release\. | sort -n | tail -n 1

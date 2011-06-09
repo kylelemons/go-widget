@@ -10,25 +10,13 @@ indexes:
 # automatically uploaded to the admin console when you next deploy
 # your application using appcfg.py.
 
-- kind: Architecture
-  properties:
-  - name: Widget
-  - name: Time
-    direction: desc
-
-- kind: Broken
+- kind: Build
   properties:
   - name: Widget
   - name: Time
     direction: desc
 
 - kind: Commit
-  properties:
-  - name: Widget
-  - name: Time
-    direction: desc
-
-- kind: Compilation
   properties:
   - name: Widget
   - name: Time
