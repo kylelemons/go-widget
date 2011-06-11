@@ -15,8 +15,10 @@ var myWidgetTemplate = ``+
 `<html>
 <head>
 	<title>My Widgets</title>
+{CSS}
 </head>
 <body>
+{Header}
 <h1>My Widgets</h1>
 {.repeated section Widget}
 <hr/>
@@ -86,6 +88,8 @@ FF4B2F	BF5A4A	A6240F	FF7863	FF9C8C
 `
 
 type myWidgetData struct {
+	CSS string
+	Header string
 	Widget []*Widget
 }
 
@@ -99,7 +103,10 @@ func myWidgets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := myWidgetData{ }
+	data := myWidgetData{
+		CSS: commonCSS(),
+		Header: header(ctx),
+	}
 
 	data.Widget, err = LoadWidgets(ctx)
 	if err != nil {
