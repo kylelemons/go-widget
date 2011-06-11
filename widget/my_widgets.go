@@ -116,8 +116,6 @@ func myWidgets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page.Execute(w, data)
-
-	fmt.Fprintf(w, "<!--\n%#v\n-->", r)
 }
 
 // TODO(kevlar): Move to init

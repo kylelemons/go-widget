@@ -45,10 +45,13 @@ func taskUpgrade(out http.ResponseWriter, r *http.Request) {
 		w.HomeURL, _ = widget["HomeURL"].(string)
 		w.BugURL, _ = widget["BugURL"].(string)
 		w.SourceURL, _ = widget["SourceURL"].(string)
+		w.CachedScore, _ = widget["CachedScore"].(int64)
+		w.CachedRating, _ = widget["CachedRating"].(int64)
 
 		widgets = append(widgets, w)
 		go func() {
 			var err os.Error
+			w.populate()
 			if !testing {
 				err = w.Commit()
 			}
@@ -95,6 +98,10 @@ func taskRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 	widget.dirty = true
 	widget.populate()
+	err = widget.Commit()
+	if err != nil {
+		ctx.Logf("update: commit: %s", err)
+	}
 
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprintf(w, "OK")

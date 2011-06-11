@@ -1,5 +1,5 @@
 application: go-widget
-version: 0-0-5-devel
+version: 0-0-6-devel
 runtime: go
 api_version: 1
 
@@ -9,9 +9,13 @@ handlers:
   upload: favicon.ico
   expiration: "7d"
 
-- url: /task/.*
+- url: /
   script: _go_app
-  login: admin
+  login: optional
+
+- url: /leaderboard
+  script: _go_app
+  login: optional
 
 - url: /hook/.*
   script: _go_app
@@ -20,6 +24,10 @@ handlers:
 - url: /widget/show/.*
   script: _go_app
   login: optional
+
+- url: /task/.*
+  script: _go_app
+  login: admin
 
 - url: /.*
   script: _go_app

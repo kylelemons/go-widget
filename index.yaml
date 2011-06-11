@@ -24,5 +24,12 @@ indexes:
 
 - kind: Widget
   properties:
+  - name: CachedScore
+    direction: desc
+  - name: CachedRating
+    direction: desc
+
+- kind: Widget
+  properties:
   - name: Owner
   - name: Name

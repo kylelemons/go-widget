@@ -9,6 +9,8 @@ func init() {
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/logout", logout)
 
+	http.HandleFunc("/leaderboard", leaderBoard)
+
 	http.HandleFunc("/widget/list", myWidgets)
 	http.HandleFunc("/widget/add", addWidget)
 	http.HandleFunc("/widget/show/", showWidget)
@@ -25,7 +27,7 @@ func init() {
 }
 
 func root(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/widget/list", http.StatusFound)
+	http.Redirect(w, r, "/leaderboard", http.StatusFound)
 }
 
 func fourOhFour(w http.ResponseWriter, r *http.Request) {

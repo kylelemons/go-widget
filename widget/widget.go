@@ -40,6 +40,10 @@ type Widget struct {
 	HomeURL   string
 	BugURL    string
 	SourceURL string
+
+	// For leaderboard
+	CachedScore int64
+	CachedRating int64
 }
 
 func (w *Widget) CompileDate() string {
@@ -120,6 +124,22 @@ func LoadWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
 	query := datastore.NewQuery("Widget")
 	query.Filter("Owner =", u.Email)
 	query.Order("Name")
+
+	var k []*datastore.Key
+	k, err = query.GetAll(ctx, &widgets)
+	for i, w := range widgets {
+		w.ctx = ctx
+		w.key = k[i]
+	}
+
+	return
+}
+
+func LoadTopWidgets(ctx appengine.Context) (widgets []*Widget, err os.Error) {
+	query := datastore.NewQuery("Widget")
+	query.Order("-CachedScore")
+	query.Order("-CachedRating")
+	query.Limit(50)
 
 	var k []*datastore.Key
 	k, err = query.GetAll(ctx, &widgets)
@@ -287,6 +307,9 @@ func (w *Widget) populate() {
 	w.populated = true
 	w.ctx.Logf("Widget %s populated", w.ID)
 
+	w.CachedRating = int64(w.rating)
+	w.CachedScore = int64(w.Score())
+
 	cache["Broken"] = w.broken
 	cache["Rating"] = w.rating
 	cache["Builds"] = w.builds
@@ -338,128 +361,6 @@ func (w *Widget) CheckinTotal() int {
 func (w *Widget) CheckinWeek() int {
 	if !w.populated { w.populate() }
 	return w.commitWeek
-}
-
-var widgetStatic string
-var widgetStaticTemplate = `` +
-	`<style type="text/css">
-.gowidget
-{
-	margin: 5px;
-	width: 300px;
-	border-collapse: collapse;
-	border-spacing: 0;
-}
-
-.gowidget th, .gowidget td
-{
-	width: 150px;
-	font-weight: normal;
-	font-size: 10pt;
-	margin: 0;
-	padding: 2px 8px;
-	text-align: center;
-}
-
-.gowidget tbody th, .gowidget tbody td
-{
-	color: ${Main.Text};
-	background: ${Main.Background};
-	border: 1px solid ${Main.Border};
-}
-
-.gowidget tbody th
-{
-	width: 70px;
-}
-
-.gowidget thead th, .gowidget thead td
-{
-	color: ${Good.Text};
-	background: ${Good.Background};
-	border: 1px solid ${Good.Border};
-	font-size: 12pt;
-}
-
-.gowidget tfoot th, .gowidget tfoot td
-{
-	color: ${Good.Text};
-	border-top: 1px solid ${Good.Border};
-}
-
-.gowidget a:link, .gowidget a:hover, .gowidget a:active, .gowidget a:visited
-{
-	color: ${Main.Text};
-	text-decoration: none;
-}
-
-.gowidget a:hover
-{
-	text-decoration: underline;
-}
-
-.gowidget thead a:link, .gowidget thead a:hover, .gowidget thead a:active, .gowidget thead a:visited
-{
-	font-weight: bold;
-	color: ${Good.Text};
-}
-
-.gowidget th
-{
-	font-weight: bold;
-}
-
-.gowidget tfoot td
-{
-	font-size: 8pt;
-}
-
-.gowidget .tiny
-{
-	width: 100px;
-	display: inline-block;
-	font-size: 8pt;
-	text-align: left;
-}
-
-.gowidget .tiny:first-child
-{
-	text-align: right;
-}
-
-
-.gowidget .tiny a
-{
-	padding: 0 4px;
-}
-
-.gowidget tbody tr th:first-child
-{
-	text-align: right;
-}
-</style>
-<script type="text/javascript">
-function expand(element, index) {
-	table = element.parentNode.parentNode.parentNode.parentNode;
-	table.tBodies[index].style.display = "table-row-group";
-	table.tBodies[1-index].style.display = "none";
-}
-</script>
-`
-
-type Pallete struct {
-	Text, Text2, Border, Light, Background string
-}
-
-type ColorScheme struct {
-	Main, Good, Warn, Bad Pallete
-}
-
-var widgetColors = ColorScheme{
-	Main: Pallete{"#2E733E", "#30663C", "#1E602D", "#8BDD9D", "#B3DDBC"},
-	Good: Pallete{"#26585C", "#274E52", "#19494E", "#89D1D8", "#AFD4D8"},
-	Warn: Pallete{"#98683D", "#866140", "#805128", "#E6B991", "#E6CFBA"},
-	Bad:  Pallete{"#98463D", "#864640", "#803028", "#E69991", "#E6BEBA"},
 }
 
 var widgetTemplate = template.MustParse(``+
@@ -529,20 +430,7 @@ var widgetTemplate = template.MustParse(``+
 `, nil)
 
 func (w *Widget) Execute(out io.Writer) os.Error {
-	if len(widgetStatic) == 0 {
-		buf := bytes.NewBuffer(nil)
-		static := template.New(nil)
-		static.SetDelims("${", "}")
-		err := static.Parse(widgetStaticTemplate)
-		if err == nil {
-			err = static.Execute(buf, widgetColors)
-		}
-		if err != nil {
-			fmt.Fprintf(buf, "<b>Error</b>: %s<br/>", err)
-		}
-		widgetStatic = buf.String()
-	}
-	fmt.Fprint(out, widgetStatic)
+	writeWidgetCSS(out)
 	return widgetTemplate.Execute(out, w)
 }
 
