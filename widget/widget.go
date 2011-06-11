@@ -443,8 +443,12 @@ func (w *Widget) ExecuteString() string {
 	if err != nil {
 		return "<b>Error:</b> " + html.EscapeString(err.String())
 	}
-	if bytes.IndexByte(buf.Bytes(), '\'') >= 0 {
+	if idx := bytes.IndexByte(buf.Bytes(), '\''); idx >= 0 {
 		return "<p><b>Error</b>: Banned character found in template</p>"
+		/*
+		fmt.Fprintf(buf, "\n<p><b>Error</b>: Banned character found in template at index %d: %s</p>", idx,
+			string(buf.Bytes()[idx-5:idx+5]))
+		*/
 	}
 	return buf.String()
 }

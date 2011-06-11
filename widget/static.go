@@ -27,7 +27,7 @@ var gowidgetColors = ColorScheme{
 
 var widgetStatic string
 var widgetStaticTemplate = `` +
-`<style type='text/css'>
+`<style type="text/css">
 .gowidget
 {
 	margin: 5px;
@@ -151,7 +151,7 @@ func writeWidgetCSS(w io.Writer) {
 
 var commonStatic string
 var commonStaticTemplate = `` +
-`<style type='text/css'>
+`<style type="text/css">
 body
 {
 	margin-top: 30px;
