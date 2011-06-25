@@ -204,16 +204,16 @@ func updateWidget(w http.ResponseWriter, r *http.Request) {
 	fix := func(formname string) string {
 		raw := r.FormValue(formname)
 		if strings.Contains(raw, "'") {
-			ctx.Logf("Hacking attempt: %#q", raw)
+			ctx.Warningf("Hacking attempt: %#q", raw)
 			return ""
 		}
 		url, err := http.ParseURLReference(raw)
 		if err != nil {
-			ctx.Logf("Bad URL: %#q", raw)
+			ctx.Infof("Bad URL: %#q", raw)
 			return ""
 		}
 		if scheme := strings.ToLower(url.Scheme); scheme != "http" && scheme != "https" {
-			ctx.Logf("Bad scheme: %%q", scheme)
+			ctx.Infof("Bad scheme: %%q", scheme)
 			return ""
 		}
 		return url.String()

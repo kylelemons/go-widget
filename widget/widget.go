@@ -187,7 +187,7 @@ func (w *Widget) Score() (score int) {
 func (w *Widget) populate() {
 	defer func() {
 		if err := recover(); err != nil {
-			w.ctx.Logf("populate(): %s", err)
+			w.ctx.Debugf("populate(): %s", err)
 		}
 	}()
 
@@ -208,8 +208,8 @@ func (w *Widget) populate() {
 		if _, err := memcache.Gob.Get(w.ctx, "widget:"+w.ID, &cache); err != memcache.ErrCacheMiss {
 			chk(err)
 
-			w.ctx.Logf("Cache hit: %s", w.ID)
-			w.ctx.Logf(" - %v", cache)
+			w.ctx.Debugf("Cache hit: %s", w.ID)
+			w.ctx.Debugf(" - %v", cache)
 
 			w.rating = cache["Rating"].(int)
 			w.broken = cache["Broken"].(int)
@@ -227,7 +227,7 @@ func (w *Widget) populate() {
 			return
 		}
 	} else {
-		w.ctx.Logf("Cache: Widget %s is dirty", w.ID)
+		w.ctx.Debugf("Cache: Widget %s is dirty", w.ID)
 	}
 
 	lastweek := now() - datastore.SecondsToTime(7*24*60*60)
@@ -241,14 +241,14 @@ func (w *Widget) populate() {
 	query.Filter("Widget =", w.key)
 	w.broken, err = query.Count(w.ctx)
 	chk(err)
-	w.ctx.Logf("Widget %s has %d broken", w.ID, w.broken)
+	w.ctx.Debugf("Widget %s has %d broken", w.ID, w.broken)
 
 	// Rating
 	query = datastore.NewQuery("Rating")
 	query.Filter("Widget =", w.key)
 	w.rating, err = query.Count(w.ctx)
 	chk(err)
-	w.ctx.Logf("Widget %s has %d rating", w.ID, w.rating)
+	w.ctx.Debugf("Widget %s has %d rating", w.ID, w.rating)
 
 	// Get Commits
 	query = datastore.NewQuery("Commit")
@@ -256,11 +256,11 @@ func (w *Widget) populate() {
 	query.Order("-Time")
 	w.commits, err = query.Count(w.ctx)
 	chk(err)
-	w.ctx.Logf("Widget %s has %d commits", w.ID, w.commits)
+	w.ctx.Debugf("Widget %s has %d commits", w.ID, w.commits)
 	query.Filter("Time >", lastweek)
 	w.commitWeek, err = query.Count(w.ctx)
 	chk(err)
-	w.ctx.Logf("Widget %s has %d commits this week", w.ID, w.commitWeek)
+	w.ctx.Debugf("Widget %s has %d commits this week", w.ID, w.commitWeek)
 
 	query = datastore.NewQuery("Commit")
 	query.Filter("Widget =", w.key)
@@ -271,7 +271,7 @@ func (w *Widget) populate() {
 	if len(items) > 0 {
 		w.commitLast = items[0].Time
 	}
-	w.ctx.Logf("Widget %s was committed %d", w.ID, w.commitLast)
+	w.ctx.Debugf("Widget %s was committed %d", w.ID, w.commitLast)
 
 	// Get builds
 	query = datastore.NewQuery("Build")
@@ -279,11 +279,11 @@ func (w *Widget) populate() {
 	query.Order("-Time")
 	w.builds, err = query.Count(w.ctx)
 	chk(err)
-	w.ctx.Logf("Widget %s has %d builds", w.ID, w.builds)
+	w.ctx.Debugf("Widget %s has %d builds", w.ID, w.builds)
 	query.Filter("Time >", lastweek)
 	w.buildWeek, err = query.Count(w.ctx)
 	chk(err)
-	w.ctx.Logf("Widget %s has %d builds this week", w.ID, w.buildWeek)
+	w.ctx.Debugf("Widget %s has %d builds this week", w.ID, w.buildWeek)
 
 	query = datastore.NewQuery("Build")
 	query.Filter("Widget =", w.key)
@@ -300,12 +300,12 @@ func (w *Widget) populate() {
 		chk(err)
 	} else {
 		w.buildHead = 0
-		w.ctx.Logf("Widget %s has no commits", w.ID)
+		w.ctx.Debugf("Widget %s has no commits", w.ID)
 	}
-	w.ctx.Logf("Widget %s has %d builds at HEAD", w.ID, w.buildHead)
+	w.ctx.Debugf("Widget %s has %d builds at HEAD", w.ID, w.buildHead)
 
 	w.populated = true
-	w.ctx.Logf("Widget %s populated", w.ID)
+	w.ctx.Debugf("Widget %s populated", w.ID)
 
 	w.CachedRating = int64(w.rating)
 	w.CachedScore = int64(w.Score())
@@ -325,7 +325,7 @@ func (w *Widget) populate() {
 		Object: cache,
 	})
 	chk(err)
-	w.ctx.Logf("Cached: Widget %s", w.ID)
+	w.ctx.Debugf("Cached: Widget %s", w.ID)
 }
 
 func (w *Widget) Rating() int {

@@ -100,7 +100,7 @@ func taskRefresh(w http.ResponseWriter, r *http.Request) {
 	widget.populate()
 	err = widget.Commit()
 	if err != nil {
-		ctx.Logf("update: commit: %s", err)
+		ctx.Debugf("update: commit: %s", err)
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
@@ -112,10 +112,10 @@ func refreshWidget(w http.ResponseWriter, r *http.Request, widgetID string) {
 	ctx := appengine.NewContext(r)
 
 	task := taskqueue.NewPOSTTask("/task/refresh/"+widgetID, nil)
-	err = taskqueue.Add(ctx, task, "default")
+	_, err = taskqueue.Add(ctx, task, "default")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Add: %s", err), http.StatusInternalServerError)
 		return
 	}
-	ctx.Logf("Refresh: Widget %s refresh queued", widgetID)
+	ctx.Debugf("Refresh: Widget %s refresh queued", widgetID)
 }
